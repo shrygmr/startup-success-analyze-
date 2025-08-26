@@ -1,0 +1,79 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+# Veriyi yükle ve temizle
+df = pd.read_csv('cleaned_funding2_dataset.csv')
+df['is_successful'] = df['status'].isin(['operating', 'acquired', 'ipo']).astype(int)
+
+# 1. Korelasyon Analizi
+correlation = df[['funding_total_usd', 'is_successful']].corr(method='pearson')
+print("═"*50)
+print("FON MİKTARI VE BAŞARI KORELASYONU".center(50))
+print("═"*50)
+print(correlation)
+
+# 2. Görselleştirme
+plt.figure(figsize=(12, 6))
+
+# a) Scatter Plot (Log ölçekli)
+plt.subplot(1, 2, 1)
+sns.scatterplot(
+    x='funding_total_usd',
+    y='is_successful',
+    data=df,
+    alpha=0.3,
+    color='blue'
+)
+plt.xscale('log')
+plt.title('Fon Miktarı ve Başarı İlişkisi (Tüm Şirketler)')
+plt.xlabel('Fon Miktarı (USD - log scale)')
+plt.ylabel('Başarı Durumu (1=Başarılı)')
+plt.grid(True, alpha=0.2)
+
+# b) Fon Aralıklarına Göre Başarı Oranları
+plt.subplot(1, 2, 2)
+df['funding_range'] = pd.cut(
+    df['funding_total_usd'],
+    bins=[0, 1e5, 1e6, 5e6, 1e7, 5e7, np.inf],
+    labels=['<100K', '100K-1M', '1M-5M', '5M-10M', '10M-50M', '50M+']
+)
+success_by_funding = df.groupby('funding_range')['is_successful'].mean() * 100
+
+sns.barplot(
+    x=success_by_funding.index,
+    y=success_by_funding.values,
+    palette='viridis',
+    edgecolor='black'
+)
+plt.title('Fon Aralığına Göre Başarı Oranları')
+plt.xlabel('Fon Miktarı Aralığı')
+plt.ylabel('Başarı Oranı (%)')
+plt.xticks(rotation=45)
+plt.ylim(0, 100)
+
+# Değer etiketleri
+for i, v in enumerate(success_by_funding.values):
+    plt.text(i, v + 2, f"{v:.1f}%", ha='center')
+
+plt.tight_layout()
+plt.show()
+
+# 3. İstatistiksel Test (Opsiyonel)
+from scipy.stats import ttest_ind
+
+successful = df[df['is_successful'] == 1]['funding_total_usd']
+unsuccessful = df[df['is_successful'] == 0]['funding_total_usd']
+
+t_stat, p_value = ttest_ind(successful, unsuccessful, equal_var=False)
+print("\n═"*50)
+print("İSTATİSTİKSEL TEST SONUCU".center(50))
+print("═"*50)
+print(f"Başarılı şirketlerin ortalama fonu: ${successful.mean():,.0f}")
+print(f"Başarısız şirketlerin ortalama fonu: ${unsuccessful.mean():,.0f}")
+print(f"t-istatistiği: {t_stat:.2f}, p-değeri: {p_value:.4f}")
+if p_value < 0.05:
+    print("Sonuç: Başarılı ve başarısız şirketlerin fon miktarları arasında istatistiksel olarak anlamlı fark var.")
+else:
+    print("Sonuç: Anlamlı fark yok.")
